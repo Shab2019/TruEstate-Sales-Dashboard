@@ -1,173 +1,125 @@
-import React, { useEffect, useState } from "react";
-import SearchBar from "./components/SearchBar.jsx";
-import FiltersPanel from "./components/FiltersPanel.jsx";
-import SortDropdown from "./components/SortDropdown.jsx";
-import SalesTable from "./components/SalesTable.jsx";
-import Pagination from "./components/Pagination.jsx";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 function App() {
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({
-    regions: [],
-    genders: [],
-    categories: [],
-    paymentMethods: [],
-    tags: [],
-    ageMin: "",
-    ageMax: "",
-    dateFrom: "",
-    dateTo: "",
-  });
-  const [sort, setSort] = useState("date_desc");
-  const [page, setPage] = useState(1);
-
-  const [filterOptions, setFilterOptions] = useState(null);
   const [sales, setSales] = useState([]);
-  const [meta, setMeta] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [filters, setFilters] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState(null);
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [total, setTotal] = useState(0);
 
-  // Load filter options once
+  const fetchSales = async () => {
+    try {
+      const res = await axios.get(
+        `${API_BASE}/api/sales?page=${page}&limit=${limit}&search=${search}&sortField=${sortField}&sortOrder=${sortOrder}`
+      );
+      setSales(res.data.data);
+      setTotal(res.data.total);
+    } catch (err) {
+      console.error("Sales fetch error:", err);
+    }
+  };
+
+  const fetchFilters = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/api/sales/filters`);
+      setFilters(res.data.fields);
+    } catch (err) {
+      console.error("Filters fetch error:", err);
+    }
+  };
+
   useEffect(() => {
-    fetch(`${API_BASE}/api/sales/filters`)
-      .then((res) => res.json())
-      .then((data) => setFilterOptions(data))
-      .catch((err) => console.error("Failed to load filter options", err));
+    fetchFilters();
   }, []);
 
-  // Fetch sales data when input changes
   useEffect(() => {
-    const controller = new AbortController();
-    async function fetchSales() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const params = new URLSearchParams();
-        if (search) params.set("search", search);
-
-        if (filters.regions.length)
-          params.set("region", filters.regions.join(","));
-        if (filters.genders.length)
-          params.set("gender", filters.genders.join(","));
-        if (filters.categories.length)
-          params.set("category", filters.categories.join(","));
-        if (filters.paymentMethods.length)
-          params.set("payment", filters.paymentMethods.join(","));
-        if (filters.tags.length) params.set("tags", filters.tags.join(","));
-
-        if (filters.ageMin) params.set("ageMin", filters.ageMin);
-        if (filters.ageMax) params.set("ageMax", filters.ageMax);
-        if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-        if (filters.dateTo) params.set("dateTo", filters.dateTo);
-
-        params.set("sort", sort);
-        params.set("page", String(page));
-
-        const url = `${API_BASE}/api/sales?${params.toString()}`;
-        const res = await fetch(url, { signal: controller.signal });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch data");
-        }
-
-        const json = await res.json();
-        setSales(json.data || []);
-        setMeta(json.meta || null);
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message || "Something went wrong");
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchSales();
+  }, [page, search, sortField, sortOrder]);
 
-    return () => controller.abort();
-  }, [search, filters, sort, page]);
+  const totalPages = Math.ceil(total / limit);
 
-  const handleFiltersChange = (updated) => {
-    setFilters((prev) => ({ ...prev, ...updated }));
-    setPage(1);
-  };
-
-  const handleSortChange = (value) => {
-    setSort(value);
-    setPage(1);
-  };
-
-  const handlePageChange = (newPage) => {
-    if (!meta) return;
-    if (newPage < 1 || newPage > meta.totalPages) return;
-    setPage(newPage);
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-4">
-        <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              Retail Sales Management System
-            </h1>
-            <p className="text-sm text-slate-500">
-              Search, filter, sort and explore sales transactions.
-            </p>
-          </div>
-        </header>
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-4 text-center">
+        TruEstate Sales Dashboard
+      </h1>
 
-        {/* 🔥 Tailwind Test — remove after confirming Tailwind works */}
-        <div className="text-4xl font-bold text-red-600">
-          TAILWIND TEST
-        </div>
+      {/* SEARCH BAR */}
+      <input
+        type="text"
+        placeholder="Search..."
+        className="border p-2 mb-4 w-full"
+        value={search}
+        onChange={(e) => {
+          setPage(1);
+          setSearch(e.target.value);
+        }}
+      />
 
-        <SearchBar value={search} onChange={setSearch} />
+      {/* SALES TABLE */}
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            {filters.map((field) => (
+              <th
+                key={field}
+                onClick={() => handleSort(field)}
+                className="border p-2 cursor-pointer bg-gray-100 hover:bg-gray-200"
+              >
+                {field} {sortField === field ? (sortOrder === "asc" ? "▲" : "▼") : ""}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sales.map((row, idx) => (
+            <tr key={idx} className="border hover:bg-gray-50">
+              {filters.map((f) => (
+                <td key={f} className="border p-2 text-sm">
+                  {row[f]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-        <div className="grid grid-cols-1 md:grid-cols-[260px,1fr] gap-4">
-          <aside>
-            <FiltersPanel
-              filters={filters}
-              options={filterOptions}
-              onChange={handleFiltersChange}
-            />
-          </aside>
+      {/* PAGINATION */}
+      <div className="flex justify-between mt-4">
+        <button
+          className="px-4 py-2 border rounded"
+          disabled={page === 1}
+          onClick={() => setPage((prev) => prev - 1)}
+        >
+          Previous
+        </button>
 
-          <main className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <SortDropdown value={sort} onChange={handleSortChange} />
-              {meta && (
-                <span className="text-xs text-slate-500">
-                  Showing {sales.length} of {meta.totalItems} results
-                </span>
-              )}
-            </div>
+        <span className="text-sm font-semibold">
+          Page {page} of {totalPages}
+        </span>
 
-            <div className="bg-white shadow-sm rounded-xl border border-slate-200">
-              {loading ? (
-                <div className="p-6 text-center text-sm text-slate-500">
-                  Loading transactions...
-                </div>
-              ) : error ? (
-                <div className="p-6 text-center text-sm text-red-500">
-                  {error}
-                </div>
-              ) : sales.length === 0 ? (
-                <div className="p-6 text-center text-sm text-slate-500">
-                  No results found. Try changing search or filters.
-                </div>
-              ) : (
-                <SalesTable items={sales} />
-              )}
-            </div>
-
-            <Pagination meta={meta} onPageChange={handlePageChange} />
-          </main>
-        </div>
+        <button
+          className="px-4 py-2 border rounded"
+          disabled={page === totalPages}
+          onClick={() => setPage((prev) => prev + 1)}
+        >
+          Next
+        </button>
       </div>
     </div>
   );
