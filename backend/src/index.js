@@ -1,28 +1,18 @@
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { loadSalesData } = require("./utils/csvLoader");
+const { loadCSVFromURL } = require("./utils/csvLoader");
 const salesRoutes = require("./routes/salesRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-
 app.use(cors());
-app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("TruEstate Retail Sales Backend is running");
+const CSV_URL = "https://drive.google.com/uc?export=download&id=1SEuCFRU0BTgfJRj-G7V6Bam3Cs3p2dJJ";
+
+loadCSVFromURL(CSV_URL).then(() => {
+  console.log("CSV file loaded via Google Drive");
 });
 
 app.use("/api/sales", salesRoutes);
 
-loadSalesData()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Backend server listening on port ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error("Failed to load CSV. Server not started.", err);
-    process.exit(1);
-  });
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
