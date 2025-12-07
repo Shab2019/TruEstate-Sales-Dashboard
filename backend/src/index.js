@@ -6,13 +6,16 @@ const salesRoutes = require("./routes/salesRoutes");
 const app = express();
 app.use(cors());
 
-const CSV_URL = "https://drive.google.com/uc?export=download&id=1SEuCFRU0BTgfJRj-G7V6Bam3Cs3p2dJJ";
+const CSV_URL = "https://we.tl/t-LPwR5KFqrF";
 
-loadCSVFromURL(CSV_URL).then(() => {
-  console.log("CSV file loaded via Google Drive");
-});
+(async () => {
+  await loadCSVFromURL(CSV_URL);
+  console.log("CSV loaded, backend is ready to accept traffic");
+})();
 
 app.use("/api/sales", salesRoutes);
 
+app.get("/", (_, res) => res.send("Backend Running ✓"));
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => console.log("Server running on port", PORT));
